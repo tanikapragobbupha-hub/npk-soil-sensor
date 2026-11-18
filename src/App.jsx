@@ -3,6 +3,7 @@ import {
   Wifi, WifiOff, Clock, Sprout, Leaf, BarChart3, History, Book, QrCode,
   ChevronLeft, CheckCircle2, AlertTriangle, XCircle, Loader2, AlertCircle, Inbox,
   Droplets, Thermometer, Zap, FlaskConical,
+  TrendingUp, TrendingDown, Search, Copy, Check,
 } from "lucide-react";
 import { getLatestSoilReading } from "./lib/supabase.js";
 
@@ -244,6 +245,151 @@ function DashboardPage({ goTo, soil }) {
       </div>
 
       <div className="px-5 mt-4 flex flex-col gap-3 flex-1">
+        {NUTRIENTS.map((n) => <NutrientCard key={n.key} n={n} />)}
+
+        <div className="grid grid-cols-2 gap-2 mt-1">
+          {SECONDARY_METRICS.map((m) => <SecondaryMetricCard key={m.key} metric={m} />)}
+        </div>
+
+        <button
+          onClick={() => goTo("recommend")}
+          className="mt-2 rounded-2xl py-3.5 flex items-center justify-center gap-2 text-sm font-medium"
+          style={{ background: TOKENS.soil, color: "#F5F0E6" }}
+        >
+          <Leaf size={16} /> ดูคำแนะนำพืชที่เหมาะกับดินนี้
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- หน้าแนะนำพืชจากดิน ---------- */
+
+const LABEL = { n: "ไนโตรเจน (N)", p: "ฟอสฟอรัส (P)", k: "โพแทสเซียม (K)" };
+const COLOR = { n: TOKENS.n, p: TOKENS.p, k: TOKENS.k };
+
+function NutrientLine({ code, evalResult, criterion }) {
+  const { status, diff } = evalResult;
+  const icon =
+    status === "ok" ? <CheckCircle2 size={16} color={TOKENS.ok} /> :
+    status === "low" ? <AlertTriangle size={16} color={TOKENS.warn} /> :
+    <XCircle size={16} color={TOKENS.bad} />;
+  const text =
+    status === "ok" ? "อยู่ในช่วงที่เหมาะสมแล้ว" :
+    status === "low" ? `ต่ำกว่าที่ต้องการอยู่ ${diff} ${criterion.unit} — ควรเพิ่ม` :
+    `สูงกว่าที่ต้องการอยู่ ${diff} ${criterion.unit} — ควรลด`;
+  return (
+    <div className="flex items-start gap-2 py-1.5">
+      {icon}
+      <div className="text-sm">
+        <span className="font-medium" style={{ color: COLOR[code] }}>{LABEL[code]}</span>
+        <span style={{ color: TOKENS.inkSoft }}> — {text}</span>
+        {criterion.is_placeholder && (
+          <span
+            className="ml-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full align-middle"
+            style={{ background: TOKENS.warnSoft, color: TOKENS.warn }}
+            title={`${criterion.source} · ${criterion.reference}`}
+          >
+            ค่าตัวอย่าง
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VerdictBadge({ verdict }) {
+  const styles = {
+    ok: { bg: TOKENS.okSoft, fg: TOKENS.ok },
+    warn: { bg: TOKENS.warnSoft, fg: TOKENS.warn },
+    bad: { bg: TOKENS.badSoft, fg: TOKENS.bad },
+  }[verdict.tone];
+  return (
+    <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: styles.bg, color: styles.fg }}>
+      {verdict.text}
+    </span>
+  );
+}
+
+function PlantCard({ plant, soil }) {
+  const result = scorePlant(plant, soil);
+  return (
+    <div className="rounded-2xl p-4" style={{ background: "#FBF8F2", boxShadow: "0 4px 14px rgba(43,36,28,0.06)" }}>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="text-lg font-semibold" style={{ color: TOKENS.ink }}>{plant.name_th}</div>
+          <div className="text-xs" style={{ color: TOKENS.inkSoft }}>{plant.name_common}</div>
+        </div>
+        <VerdictBadge verdict={result.verdict} />
+      </div>
+      <p className="text-xs mt-2" style={{ color: TOKENS.inkSoft }}>{plant.description}</p>
+      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${TOKENS.paper}` }}>
+        <NutrientLine code="n" evalResult={result.n} criterion={plant.criteria.n} />
+        <NutrientLine code="p" evalResult={result.p} criterion={plant.criteria.p} />
+        <NutrientLine code="k" evalResult={result.k} criterion={plant.criteria.k} />
+      </div>
+      <div className="text-[10px] mt-2.5" style={{ color: TOKENS.inkSoft }}>
+        เกณฑ์ธาตุอาหารด้านบนยังเป็นข้อมูลตัวอย่าง — {plant.criteria.n.reference}
+      </div>
+    </div>
+  );
+}
+
+function RecommendPage({ goTo, soil }) {
+  const ranked = [...PLANTS].sort((a, b) => scorePlant(b, soil).okCount - scorePlant(a, soil).okCount);
+  return (
+    <div className="flex flex-col flex-1">
+      <div className="px-5 pt-6 pb-5 flex items-center gap-3" style={{ background: TOKENS.soil }}>
+        <button onClick={() => goTo("dashboard")}>
+          <ChevronLeft size={20} color="#F5F0E6" />
+        </button>
+        <div>
+          <div className="text-xs" style={{ color: "#C9BFA9" }}>แปลงทดสอบ · บ้านเหมืองกา</div>
+          <div className="text-lg font-semibold text-white">แนะนำพืชจากดิน</div>
+        </div>
+      </div>
+
+      <div className="px-5 -mt-3">
+        <div className="rounded-2xl px-4 py-3 flex items-center justify-around" style={{ background: "#FBF8F2", boxShadow: "0 4px 14px rgba(43,36,28,0.08)" }}>
+          {(["n", "p", "k"]).map((code) => (
+            <div key={code} className="text-center">
+              <div className="text-xs" style={{ color: TOKENS.inkSoft }}>{code.toUpperCase()}</div>
+              <div className="text-xl font-semibold" style={{ color: COLOR[code] }}>{soil[code]}</div>
+            </div>
+          ))}
+        </div>
+        <div className="text-xs text-center mt-1.5" style={{ color: TOKENS.inkSoft }}>ค่าดินล่าสุดที่ใช้เทียบ (mg/kg)</div>
+      </div>
+
+      <div className="px-5 mt-4 flex flex-col gap-3 flex-1">
+        <div className="flex items-center gap-1.5">
+          <Leaf size={14} color={TOKENS.ok} />
+          <span className="text-xs font-medium" style={{ color: TOKENS.inkSoft }}>เรียงจากพืชที่เหมาะกับดินนี้มากสุด</span>
+        </div>
+        {ranked.map((plant) => <PlantCard key={plant.name_th} plant={plant} soil={soil} />)}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   หน้า Mockup: ประวัติการวัด / ข้อมูลพืช / QR Code
+   ⚠️ ประวัติการวัดเป็นข้อมูลตัวอย่างเพื่อสาธิต (ยังไม่ดึงจาก Supabase)
+   ============================================================ */
+
+const SITE_URL = "https://npk-soil-sensor.vercel.app";
+const QR_SIZE = 33;
+const QR_PATH = "M0 0h7v1h-7zM8 0h1v1h-1zM11 0h1v1h-1zM13 0h2v1h-2zM17 0h4v1h-4zM23 0h1v1h-1zM26 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM9 1h1v1h-1zM11 1h1v1h-1zM13 1h2v1h-2zM17 1h1v1h-1zM20 1h1v1h-1zM22 1h1v1h-1zM26 1h1v1h-1zM32 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM9 2h4v1h-4zM14 2h6v1h-6zM23 2h2v1h-2zM26 2h1v1h-1zM28 2h3v1h-3zM32 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM9 3h1v1h-1zM12 3h2v1h-2zM16 3h1v1h-1zM20 3h3v1h-3zM26 3h1v1h-1zM28 3h3v1h-3zM32 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM8 4h1v1h-1zM10 4h2v1h-2zM13 4h1v1h-1zM16 4h3v1h-3zM24 4h1v1h-1zM26 4h1v1h-1zM28 4h3v1h-3zM32 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM10 5h2v1h-2zM13 5h2v1h-2zM16 5h2v1h-2zM20 5h1v1h-1zM22 5h1v1h-1zM26 5h1v1h-1zM32 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM26 6h7v1h-7zM10 7h1v1h-1zM12 7h1v1h-1zM14 7h3v1h-3zM21 7h2v1h-2zM24 7h1v1h-1zM1 8h7v1h-7zM13 8h2v1h-2zM16 8h2v1h-2zM20 8h1v1h-1zM22 8h1v1h-1zM27 8h2v1h-2zM32 8h1v1h-1zM0 9h1v1h-1zM5 9h1v1h-1zM7 9h1v1h-1zM9 9h4v1h-4zM16 9h1v1h-1zM19 9h3v1h-3zM23 9h1v1h-1zM26 9h2v1h-2zM29 9h2v1h-2zM32 9h1v1h-1zM2 10h1v1h-1zM5 10h3v1h-3zM10 10h1v1h-1zM18 10h1v1h-1zM21 10h1v1h-1zM25 10h2v1h-2zM28 10h1v1h-1zM30 10h2v1h-2zM2 11h4v1h-4zM10 11h1v1h-1zM19 11h4v1h-4zM26 11h1v1h-1zM28 11h3v1h-3zM32 11h1v1h-1zM0 12h1v1h-1zM4 12h4v1h-4zM11 12h1v1h-1zM13 12h1v1h-1zM15 12h2v1h-2zM18 12h2v1h-2zM21 12h1v1h-1zM23 12h3v1h-3zM27 12h3v1h-3zM31 12h1v1h-1zM0 13h2v1h-2zM4 13h1v1h-1zM7 13h1v1h-1zM11 13h3v1h-3zM16 13h1v1h-1zM20 13h1v1h-1zM22 13h1v1h-1zM26 13h2v1h-2zM29 13h4v1h-4zM2 14h2v1h-2zM6 14h1v1h-1zM9 14h2v1h-2zM12 14h2v1h-2zM15 14h1v1h-1zM18 14h2v1h-2zM21 14h1v1h-1zM23 14h5v1h-5zM29 14h3v1h-3zM1 15h1v1h-1zM4 15h2v1h-2zM7 15h6v1h-6zM15 15h3v1h-3zM19 15h5v1h-5zM25 15h2v1h-2zM28 15h3v1h-3zM3 16h6v1h-6zM16 16h2v1h-2zM19 16h1v1h-1zM22 16h4v1h-4zM27 16h3v1h-3zM32 16h1v1h-1zM2 17h4v1h-4zM7 17h1v1h-1zM9 17h1v1h-1zM13 17h1v1h-1zM16 17h1v1h-1zM18 17h3v1h-3zM23 17h2v1h-2zM26 17h2v1h-2zM29 17h4v1h-4zM1 18h1v1h-1zM5 18h2v1h-2zM8 18h1v1h-1zM10 18h1v1h-1zM13 18h2v1h-2zM16 18h3v1h-3zM20 18h1v1h-1zM22 18h1v1h-1zM27 18h2v1h-2zM30 18h2v1h-2zM0 19h3v1h-3zM4 19h2v1h-2zM8 19h1v1h-1zM11 19h2v1h-2zM14 19h4v1h-4zM20 19h1v1h-1zM23 19h3v1h-3zM27 19h4v1h-4zM32 19h1v1h-1zM3 20h5v1h-5zM10 20h1v1h-1zM13 20h1v1h-1zM15 20h3v1h-3zM20 20h6v1h-6zM27 20h3v1h-3zM31 20h2v1h-2zM0 21h2v1h-2zM4 21h2v1h-2zM9 21h1v1h-1zM11 21h3v1h-3zM15 21h4v1h-4zM24 21h3v1h-3zM30 21h1v1h-1zM32 21h1v1h-1zM0 22h1v1h-1zM3 22h1v1h-1zM5 22h2v1h-2zM8 22h2v1h-2zM11 22h1v1h-1zM15 22h2v1h-2zM20 22h3v1h-3zM24 22h3v1h-3zM31 22h1v1h-1zM0 23h1v1h-1zM3 23h3v1h-3zM7 23h5v1h-5zM14 23h1v1h-1zM21 23h1v1h-1zM24 23h1v1h-1zM26 23h1v1h-1zM29 23h2v1h-2zM32 23h1v1h-1zM0 24h1v1h-1zM2 24h1v1h-1zM4 24h1v1h-1zM6 24h4v1h-4zM11 24h3v1h-3zM24 24h5v1h-5zM8 25h1v1h-1zM13 25h3v1h-3zM19 25h3v1h-3zM24 25h1v1h-1zM28 25h1v1h-1zM30 25h1v1h-1zM32 25h1v1h-1zM0 26h7v1h-7zM8 26h2v1h-2zM11 26h1v1h-1zM14 26h2v1h-2zM18 26h1v1h-1zM20 26h2v1h-2zM23 26h2v1h-2zM26 26h1v1h-1zM28 26h1v1h-1zM30 26h1v1h-1zM0 27h1v1h-1zM6 27h1v1h-1zM8 27h2v1h-2zM11 27h2v1h-2zM14 27h1v1h-1zM16 27h1v1h-1zM19 27h1v1h-1zM21 27h4v1h-4zM28 27h3v1h-3zM32 27h1v1h-1zM0 28h1v1h-1zM2 28h3v1h-3zM6 28h1v1h-1zM8 28h4v1h-4zM13 28h1v1h-1zM16 28h2v1h-2zM21 28h1v1h-1zM24 28h6v1h-6zM0 29h1v1h-1zM2 29h3v1h-3zM6 29h1v1h-1zM8 29h1v1h-1zM10 29h1v1h-1zM13 29h3v1h-3zM17 29h2v1h-2zM20 29h1v1h-1zM22 29h1v1h-1zM24 29h2v1h-2zM28 29h1v1h-1zM30 29h1v1h-1zM32 29h1v1h-1zM0 30h1v1h-1zM2 30h3v1h-3zM6 30h1v1h-1zM8 30h2v1h-2zM12 30h1v1h-1zM14 30h3v1h-3zM19 30h1v1h-1zM21 30h2v1h-2zM24 30h4v1h-4zM29 30h1v1h-1zM0 31h1v1h-1zM6 31h1v1h-1zM8 31h1v1h-1zM10 31h3v1h-3zM14 31h1v1h-1zM17 31h1v1h-1zM19 31h5v1h-5zM28 31h3v1h-3zM0 32h7v1h-7zM10 32h2v1h-2zM14 32h2v1h-2zM17 32h4v1h-4zM22 32h3v1h-3zM27 32h1v1h-1zM31 32h1v1h-1z";
+
+// ข้อมูลตัวอย่าง 12 ครั้ง เรียงจากใหม่ → เก่า (ทุก 3 ชม.)
+const MOCK_HISTORY = [
+  { n: 75, p: 221, k: 215, moisture: 72.7, temperature: 33.2 },
+  { n: 73, p: 219, k: 214, moisture: 71.9, temperature: 32.8 },
+  { n: 74, p: 222, k: 212, moisture: 70.2, temperature: 32.1 },
+  { n: 70, p: 215, k: 210, moisture: 68.8, temperature: 31.0 },
+  { n: 68, p: 213, k: 211, moisture: 73.1, temperature: 30.4 },
+  { n: 69, p: 216, k: 206, moisture: 75.4, temperature: 29.8 },
+  { n: 64, p: 20className="px-5 mt-4 flex flex-col gap-3 flex-1">
         {NUTRIENTS.map((n) => <NutrientCard key={n.key} n={n} />)}
 
         <div className="grid grid-cols-2 gap-2 mt-1">
