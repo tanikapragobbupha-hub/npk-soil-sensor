@@ -389,75 +389,159 @@ const MOCK_HISTORY = [
   { n: 70, p: 215, k: 210, moisture: 68.8, temperature: 31.0 },
   { n: 68, p: 213, k: 211, moisture: 73.1, temperature: 30.4 },
   { n: 69, p: 216, k: 206, moisture: 75.4, temperature: 29.8 },
-  { n: 64, p: 20className="px-5 mt-4 flex flex-col gap-3 flex-1">
-        {NUTRIENTS.map((n) => <NutrientCard key={n.key} n={n} />)}
+  { n: 64, p: 208, k: 204, moisture: 74.0, temperature: 30.9 },
+  { n: 62, p: 205, k: 205, moisture: 69.5, temperature: 32.5 },
+  { n: 63, p: 207, k: 199, moisture: 66.2, temperature: 34.0 },
+  { n: 58, p: 200, k: 197, moisture: 64.8, temperature: 33.6 },
+  { n: 57, p: 198, k: 196, moisture: 67.3, temperature: 32.2 },
+  { n: 55, p: 196, k: 192, moisture: 70.1, temperature: 31.1 },
+];
 
-        <div className="grid grid-cols-2 gap-2 mt-1">
-          {SECONDARY_METRICS.map((m) => <SecondaryMetricCard key={m.key} metric={m} />)}
+function MockNotice({ children }) {
+  return (
+    <div className="rounded-xl px-3 py-2.5 flex items-start gap-2" style={{ background: TOKENS.warnSoft }}>
+      <AlertTriangle size={15} color={TOKENS.warn} className="mt-0.5 shrink-0" />
+      <div className="text-xs" style={{ color: TOKENS.warn }}>{children}</div>
+    </div>
+  );
+}
+
+function PageHeader({ title, goTo }) {
+  return (
+    <div className="px-5 pt-6 pb-5 flex items-center gap-3" style={{ background: TOKENS.soil }}>
+      <button onClick={() => goTo("dashboard")}>
+        <ChevronLeft size={20} color="#F5F0E6" />
+      </button>
+      <div>
+        <div className="text-xs" style={{ color: "#C9BFA9" }}>แปลงทดสอบ · บ้านเหมืองกา</div>
+        <div className="text-lg font-semibold text-white">{title}</div>
+      </div>
+    </div>
+  );
+}
+
+function TrendChart({ values, color }) {
+  const W = 320, H = 130, PX = 14, PY = 18;
+  const min = Math.min(...values), max = Math.max(...values);
+  const span = max - min || 1;
+  const pts = values.map((v, i) => [
+    PX + (i * (W - PX * 2)) / (values.length - 1),
+    PY + (1 - (v - min) / span) * (H - PY * 2),
+  ]);
+  const line = pts.map((p) => p.join(",")).join(" ");
+  const last = pts[pts.length - 1];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+      <polyline points={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+      {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="2.5" fill={color} />)}
+      <circle cx={last[0]} cy={last[1]} r="5" fill="#FBF8F2" stroke={color} strokeWidth="2.5" />
+      <text x={PX} y="12" fontSize="10" fill={TOKENS.inkSoft}>สูงสุด {max}</text>
+      <text x={PX} y={H - 4} fontSize="10" fill={TOKENS.inkSoft}>ต่ำสุด {min}</text>
+    </svg>
+  );
+}
+
+function HistoryPage({ goTo }) {
+  const [sel, setSel] = useState("n");
+  const now = Date.now();
+  const rows = MOCK_HISTORY.map((r, i) => ({
+    ...r,
+    iso: new Date(now - i * 3 * 60 * 60 * 1000).toISOString(),
+  }));
+  const series = [...rows].reverse().map((r) => r[sel]); // เก่า → ใหม่
+  const first = series[0], lastV = series[series.length - 1];
+  const delta = lastV - first;
+  const tabs = [
+    { key: "n", label: "N" },
+    { key: "p", label: "P" },
+    { key: "k", label: "K" },
+  ];
+  return (
+    <div className="flex flex-col flex-1">
+      <PageHeader title="ประวัติการวัด" goTo={goTo} />
+      <div className="px-5 mt-4 flex flex-col gap-3 flex-1">
+        <MockNotice>ข้อมูลตัวอย่างเพื่อสาธิต ยังไม่ใช่ค่าที่วัดจริง — ภายหลังจะดึงประวัติจริงจากฐานข้อมูล</MockNotice>
+
+        <div className="flex gap-2">
+          {tabs.map((t) => {
+            const active = sel === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setSel(t.key)}
+                className="flex-1 rounded-full py-2 text-sm font-semibold"
+                style={{
+                  background: active ? COLOR[t.key] : "#FBF8F2",
+                  color: active ? "#fff" : TOKENS.inkSoft,
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
-        <button
-          onClick={() => goTo("recommend")}
-          className="mt-2 rounded-2xl py-3.5 flex items-center justify-center gap-2 text-sm font-medium"
-          style={{ background: TOKENS.soil, color: "#F5F0E6" }}
-        >
-          <Leaf size={16} /> ดูคำแนะนำพืชที่เหมาะกับดินนี้
-        </button>
+        <div className="rounded-2xl p-4" style={{ background: "#FBF8F2", boxShadow: "0 4px 14px rgba(43,36,28,0.06)" }}>
+          <div className="flex items-baseline justify-between">
+            <div>
+              <div className="text-xs" style={{ color: TOKENS.inkSoft }}>{LABEL[sel]} · 36 ชั่วโมงล่าสุด</div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-semibold" style={{ color: TOKENS.ink }}>{lastV}</span>
+                <span className="text-sm" style={{ color: TOKENS.inkSoft }}>mg/kg</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-sm font-medium" style={{ color: delta >= 0 ? TOKENS.ok : TOKENS.bad }}>
+              {delta >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+              {delta >= 0 ? "+" : ""}{delta}
+            </div>
+          </div>
+          <div className="mt-2">
+            <TrendChart values={series} color={COLOR[sel]} />
+          </div>
+        </div>
+
+        <div className="text-xs font-medium mt-1" style={{ color: TOKENS.inkSoft }}>บันทึกการวัด</div>
+        <div className="flex flex-col gap-2 pb-3">
+          {rows.map((r, i) => (
+            <div key={i} className="rounded-xl px-3.5 py-3" style={{ background: "#FBF8F2" }}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: TOKENS.inkSoft }}>{formatThaiDateTime(r.iso)}</span>
+                {i === 0 && <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: TOKENS.okSoft, color: TOKENS.ok }}>ล่าสุด</span>}
+              </div>
+              <div className="flex gap-4 mt-1.5">
+                {["n", "p", "k"].map((c) => (
+                  <div key={c}>
+                    <span className="text-xs font-semibold" style={{ color: COLOR[c] }}>{c.toUpperCase()} </span>
+                    <span className="text-sm font-semibold" style={{ color: TOKENS.ink }}>{r[c]}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="text-[11px] mt-1" style={{ color: TOKENS.inkSoft }}>
+                ความชื้น {r.moisture}% · อุณหภูมิ {r.temperature}°C
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-/* ---------- หน้าแนะนำพืชจากดิน ---------- */
+/* ---------- หน้าข้อมูลพืช ---------- */
 
-const LABEL = { n: "ไนโตรเจน (N)", p: "ฟอสฟอรัส (P)", k: "โพแทสเซียม (K)" };
-const COLOR = { n: TOKENS.n, p: TOKENS.p, k: TOKENS.k };
-
-function NutrientLine({ code, evalResult, criterion }) {
-  const { status, diff } = evalResult;
-  const icon =
-    status === "ok" ? <CheckCircle2 size={16} color={TOKENS.ok} /> :
-    status === "low" ? <AlertTriangle size={16} color={TOKENS.warn} /> :
-    <XCircle size={16} color={TOKENS.bad} />;
-  const text =
-    status === "ok" ? "อยู่ในช่วงที่เหมาะสมแล้ว" :
-    status === "low" ? `ต่ำกว่าที่ต้องการอยู่ ${diff} ${criterion.unit} — ควรเพิ่ม` :
-    `สูงกว่าที่ต้องการอยู่ ${diff} ${criterion.unit} — ควรลด`;
+function RangeChip({ code, c }) {
   return (
-    <div className="flex items-start gap-2 py-1.5">
-      {icon}
-      <div className="text-sm">
-        <span className="font-medium" style={{ color: COLOR[code] }}>{LABEL[code]}</span>
-        <span style={{ color: TOKENS.inkSoft }}> — {text}</span>
-        {criterion.is_placeholder && (
-          <span
-            className="ml-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full align-middle"
-            style={{ background: TOKENS.warnSoft, color: TOKENS.warn }}
-            title={`${criterion.source} · ${criterion.reference}`}
-          >
-            ค่าตัวอย่าง
-          </span>
-        )}
-      </div>
+    <div className="rounded-lg px-2.5 py-1.5 text-center flex-1" style={{ background: TOKENS.paper }}>
+      <div className="text-[10px] font-semibold" style={{ color: COLOR[code] }}>{code.toUpperCase()}</div>
+      <div className="text-xs font-semibold" style={{ color: TOKENS.ink }}>{c.min}–{c.max}</div>
     </div>
   );
 }
 
-function VerdictBadge({ verdict }) {
-  const styles = {
-    ok: { bg: TOKENS.okSoft, fg: TOKENS.ok },
-    warn: { bg: TOKENS.warnSoft, fg: TOKENS.warn },
-    bad: { bg: TOKENS.badSoft, fg: TOKENS.bad },
-  }[verdict.tone];
-  return (
-    <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: styles.bg, color: styles.fg }}>
-      {verdict.text}
-    </span>
-  );
-}
-
-function PlantCard({ plant, soil }) {
-  const result = scorePlant(plant, soil);
+function PlantInfoCard({ plant, soil }) {
+  const [compare, setCompare] = useState(false);
+  const result = soil ? scorePlant(plant, soil) : null;
+  const cr = plant.criteria;
   return (
     <div className="rounded-2xl p-4" style={{ background: "#FBF8F2", boxShadow: "0 4px 14px rgba(43,36,28,0.06)" }}>
       <div className="flex items-start justify-between gap-2">
@@ -465,68 +549,122 @@ function PlantCard({ plant, soil }) {
           <div className="text-lg font-semibold" style={{ color: TOKENS.ink }}>{plant.name_th}</div>
           <div className="text-xs" style={{ color: TOKENS.inkSoft }}>{plant.name_common}</div>
         </div>
-        <VerdictBadge verdict={result.verdict} />
+        <span className="text-[10px] font-medium px-2 py-1 rounded-full" style={{ background: TOKENS.warnSoft, color: TOKENS.warn }}>ค่าตัวอย่าง</span>
       </div>
       <p className="text-xs mt-2" style={{ color: TOKENS.inkSoft }}>{plant.description}</p>
-      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${TOKENS.paper}` }}>
-        <NutrientLine code="n" evalResult={result.n} criterion={plant.criteria.n} />
-        <NutrientLine code="p" evalResult={result.p} criterion={plant.criteria.p} />
-        <NutrientLine code="k" evalResult={result.k} criterion={plant.criteria.k} />
+
+      <div className="text-[11px] mt-3 mb-1.5" style={{ color: TOKENS.inkSoft }}>ช่วงธาตุอาหารที่ต้องการ ({cr.n.unit})</div>
+      <div className="flex gap-2">
+        <RangeChip code="n" c={cr.n} />
+        <RangeChip code="p" c={cr.p} />
+        <RangeChip code="k" c={cr.k} />
       </div>
+
       <div className="text-[10px] mt-2.5" style={{ color: TOKENS.inkSoft }}>
-        เกณฑ์ธาตุอาหารด้านบนยังเป็นข้อมูลตัวอย่าง — {plant.criteria.n.reference}
+        แหล่งข้อมูล: {cr.n.source} — {cr.n.reference}
       </div>
+
+      {soil && (
+        <>
+          <button
+            onClick={() => setCompare((v) => !v)}
+            className="mt-3 w-full rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-1.5"
+            style={{ background: TOKENS.soil, color: "#F5F0E6" }}
+          >
+            <Sprout size={15} /> {compare ? "ซ่อนการเทียบกับดิน" : "อยากปลูกพืชนี้ — เทียบกับดินตอนนี้"}
+          </button>
+          {compare && (
+            <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${TOKENS.paper}` }}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs" style={{ color: TOKENS.inkSoft }}>ผลเทียบกับค่าดินล่าสุด</span>
+                <VerdictBadge verdict={result.verdict} />
+              </div>
+              <NutrientLine code="n" evalResult={result.n} criterion={cr.n} />
+              <NutrientLine code="p" evalResult={result.p} criterion={cr.p} />
+              <NutrientLine code="k" evalResult={result.k} criterion={cr.k} />
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
-function RecommendPage({ goTo, soil }) {
-  const ranked = [...PLANTS].sort((a, b) => scorePlant(b, soil).okCount - scorePlant(a, soil).okCount);
+function PlantsPage({ goTo, soil }) {
+  const [q, setQ] = useState("");
+  const term = q.trim().toLowerCase();
+  const list = PLANTS.filter((p) => `${p.name_th} ${p.name_common}`.toLowerCase().includes(term));
   return (
     <div className="flex flex-col flex-1">
-      <div className="px-5 pt-6 pb-5 flex items-center gap-3" style={{ background: TOKENS.soil }}>
-        <button onClick={() => goTo("dashboard")}>
-          <ChevronLeft size={20} color="#F5F0E6" />
-        </button>
-        <div>
-          <div className="text-xs" style={{ color: "#C9BFA9" }}>แปลงทดสอบ · บ้านเหมืองกา</div>
-          <div className="text-lg font-semibold text-white">แนะนำพืชจากดิน</div>
-        </div>
-      </div>
-
-      <div className="px-5 -mt-3">
-        <div className="rounded-2xl px-4 py-3 flex items-center justify-around" style={{ background: "#FBF8F2", boxShadow: "0 4px 14px rgba(43,36,28,0.08)" }}>
-          {(["n", "p", "k"]).map((code) => (
-            <div key={code} className="text-center">
-              <div className="text-xs" style={{ color: TOKENS.inkSoft }}>{code.toUpperCase()}</div>
-              <div className="text-xl font-semibold" style={{ color: COLOR[code] }}>{soil[code]}</div>
-            </div>
-          ))}
-        </div>
-        <div className="text-xs text-center mt-1.5" style={{ color: TOKENS.inkSoft }}>ค่าดินล่าสุดที่ใช้เทียบ (mg/kg)</div>
-      </div>
-
+      <PageHeader title="ข้อมูลพืช" goTo={goTo} />
       <div className="px-5 mt-4 flex flex-col gap-3 flex-1">
-        <div className="flex items-center gap-1.5">
-          <Leaf size={14} color={TOKENS.ok} />
-          <span className="text-xs font-medium" style={{ color: TOKENS.inkSoft }}>เรียงจากพืชที่เหมาะกับดินนี้มากสุด</span>
+        <MockNotice>ฐานข้อมูลพืชตอนนี้มีเพียง {PLANTS.length} ชนิดและเป็นค่าตัวอย่าง — รอข้อมูลที่ตรวจสอบแล้วจากกรมพัฒนาที่ดิน (LDD) หรือแหล่งทางการอื่น</MockNotice>
+
+        <div className="rounded-xl px-3 py-2.5 flex items-center gap-2" style={{ background: "#FBF8F2" }}>
+          <Search size={16} color={TOKENS.inkSoft} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="ค้นหาพืช เช่น ข้าวโพด"
+            className="flex-1 bg-transparent outline-none text-sm"
+            style={{ color: TOKENS.ink }}
+          />
         </div>
-        {ranked.map((plant) => <PlantCard key={plant.name_th} plant={plant} soil={soil} />)}
+
+        {list.length === 0 ? (
+          <div className="text-center text-sm py-8" style={{ color: TOKENS.inkSoft }}>ไม่พบพืชที่ค้นหา</div>
+        ) : (
+          list.map((p) => <PlantInfoCard key={p.name_th} plant={p} soil={soil} />)
+        )}
+        <div className="pb-3" />
       </div>
     </div>
   );
 }
 
-/* ---------- หน้าที่ยังไม่ได้ทำ (placeholder) ---------- */
+/* ---------- หน้า QR Code ---------- */
 
-function ComingSoonPage({ title }) {
+function QrPage({ goTo }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(SITE_URL);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      /* คัดลอกไม่ได้ในบางเบราว์เซอร์ — ไม่ต้องทำอะไร */
+    }
+  };
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-2 px-8 text-center">
-      <div className="text-lg font-semibold" style={{ color: TOKENS.ink }}>{title}</div>
-      <div className="text-sm" style={{ color: TOKENS.inkSoft }}>หน้านี้ยังไม่ได้สร้าง — กำลังทำต่อให้เร็ว ๆ นี้</div>
+    <div className="flex flex-col flex-1">
+      <PageHeader title="QR Code" goTo={goTo} />
+      <div className="px-5 mt-5 flex flex-col items-center gap-4 flex-1">
+        <div className="rounded-2xl p-5 w-full flex flex-col items-center" style={{ background: "#FBF8F2", boxShadow: "0 4px 14px rgba(43,36,28,0.06)" }}>
+          <div className="text-base font-semibold" style={{ color: TOKENS.ink }}>NPK Soil Sensor</div>
+          <div className="text-xs mb-3" style={{ color: TOKENS.inkSoft }}>สแกนเพื่อดูข้อมูลดินแบบเรียลไทม์</div>
+          <svg viewBox={`-4 -4 ${QR_SIZE + 8} ${QR_SIZE + 8}`} className="w-56 h-56 rounded-lg" style={{ background: "#FBF8F2" }}>
+            <path d={QR_PATH} fill={TOKENS.ink} shapeRendering="crispEdges" />
+          </svg>
+          <div className="text-[11px] mt-3 break-all text-center" style={{ color: TOKENS.inkSoft }}>{SITE_URL}</div>
+          <div className="text-xs mt-1 font-medium" style={{ color: TOKENS.ink }}>NPK-001 · แปลงทดสอบ บ้านเหมืองกา</div>
+        </div>
+
+        <button
+          onClick={copy}
+          className="w-full rounded-2xl py-3.5 flex items-center justify-center gap-2 text-sm font-medium"
+          style={{ background: TOKENS.soil, color: "#F5F0E6" }}
+        >
+          {copied ? <Check size={16} /> : <Copy size={16} />}
+          {copied ? "คัดลอกลิงก์แล้ว" : "คัดลอกลิงก์เว็บ"}
+        </button>
+        <div className="text-xs text-center px-4" style={{ color: TOKENS.inkSoft }}>
+          พิมพ์ QR นี้ติดบนตัวเครื่อง เกษตรกรสแกนด้วยกล้องมือถือเพื่อเปิดหน้าเว็บนี้ได้ทันที
+        </div>
+      </div>
     </div>
   );
 }
+
 
 /* ---------- แอปหลัก ---------- */
 
@@ -567,9 +705,9 @@ export default function App() {
   );
 
   let body;
-  if (page === "history") body = <ComingSoonPage title="ประวัติการวัด" />;
-  else if (page === "plants") body = <ComingSoonPage title="ข้อมูลพืช" />;
-  else if (page === "qr") body = <ComingSoonPage title="QR Code" />;
+  if (page === "history") body = <HistoryPage goTo={setPage} />;
+  else if (page === "plants") body = <PlantsPage goTo={setPage} soil={soil} />;
+  else if (page === "qr") body = <QrPage goTo={setPage} />;
   else if (status === "loading") {
     body = <StatusScreen icon={Loader2} tone="loading" title="กำลังโหลดข้อมูล..." detail="ดึงค่าล่าสุดจาก Supabase" />;
   } else if (status === "error") {
@@ -588,5 +726,4 @@ export default function App() {
       {navBar}
     </div>
   );
-    }
-            
+}
